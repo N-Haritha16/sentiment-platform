@@ -1,0 +1,92 @@
+version: '3.9'
+
+services:
+  # -------------------------------
+  # PostgreSQL Database
+  # -------------------------------
+  db:
+    image: postgres:15
+    container_name: sentiment-db
+    restart: always
+    environment:
+      POSTGRES_USER: sentiment_user
+      POSTGRES_PASSWORD: sentiment_pass
+      POSTGRES_DB: sentiment_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # -------------------------------
+  # Redis
+  # -------------------------------
+  redis:
+    image: redis:7
+    container_name: sentiment-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # -------------------------------
+  # Backend API (FastAPI)
+  # -------------------------------
+  backend:
+    build: ./backend
+    container_name: sentiment-backend
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+
+  # -------------------------------
+  # Frontend (React)
+  # -------------------------------
+  frontend:
+    build: ./frontend
+    container_name: sentiment-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://backend:8000/api
+    command: ["npm", "start"]
+
+  # -------------------------------
+  # Worker (background tasks)
+  # -------------------------------
+  worker:
+    build: ./worker
+    container_name: sentiment-worker
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  # -------------------------------
+  # Ingester (fetch social media posts)
+  # -------------------------------
+  ingester:
+    build: ./ingester
+    container_name: sentiment-ingester
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
+      REDIS_URL: redis://redis:6379/0
+      SOCIAL_API_KEY: your_api_key_here
+
+# -------------------------------
+# Volumes
+# -------------------------------
+volumes:
+  db_data:

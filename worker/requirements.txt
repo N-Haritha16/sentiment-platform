@@ -1,0 +1,7 @@
+fastapi==0.111.0         # Only if using FastAPI components
+sqlalchemy==2.1.2
+asyncpg==0.28.0          # If PostgreSQL is used
+aioredis==2.0.2          # For Redis pub/sub
+pydantic==2.1.1
+aiohttp==3.9.0           # Optional, for async HTTP requests
+python-dotenv==1.0.0     # Optional, for environment variables
