@@ -3,7 +3,7 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Install dependencies with extra retries (helps with ECONNRESET)
+# Install dependencies
 COPY package.json ./
 RUN npm config set registry https://registry.npmjs.org/ \
  && npm install \
