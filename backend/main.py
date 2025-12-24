@@ -1,21 +1,25 @@
 from fastapi import FastAPI
-from datetime import datetime
-from transformers import pipeline
+from fastapi.middleware.cors import CORSMiddleware
+from backend.api.routes import router
+from backend.models.models import engine, Base
 
-app = FastAPI()
-sentiment_model = pipeline("sentiment-analysis", return_all_scores=True)
+app = FastAPI(
+    title="Sentiment Platform API",
+    version="1.0.0"
+)
 
-@app.post("/analyze")
-async def analyze_text(payload: dict):
-    text = payload.get("text", "")
+# ✅ ADD THIS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # frontend access
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    results = sentiment_model(text)[0]
-    scores = {r["label"].lower(): round(r["score"], 2) for r in results}
+@app.on_event("startup")
+async def startup_event():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    sentiment = max(scores, key=scores.get)
-
-    return {
-        "sentiment": sentiment,
-        "scores": scores,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+app.include_router(router)

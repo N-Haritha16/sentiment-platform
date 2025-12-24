@@ -1,112 +1,50 @@
-import json
 import asyncio
 import logging
-from kafka import KafkaConsumer
-from sqlalchemy.orm import sessionmaker
-from services.sentiment_analyzer import SentimentAnalyzer
+import redis.asyncio as redis
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
+from backend.config import DATABASE_URL, REDIS_URL, REDIS_STREAM_NAME
+from services.sentiment_analyser import SentimentAnalyzer
 from processor import save_post_and_analysis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sentiment-worker")
 
+engine = create_async_engine(DATABASE_URL)
+Session = async_sessionmaker(engine, expire_on_commit=False)
 
 class SentimentWorker:
-    """
-    Consumes posts from Kafka and processes them through sentiment analysis
-    """
-
-    def __init__(
-        self,
-        kafka_bootstrap_servers: str,
-        topic_name: str,
-        consumer_group: str,
-        db_session_maker: sessionmaker,
-    ):
-        self.consumer = KafkaConsumer(
-            topic_name,
-            bootstrap_servers=kafka_bootstrap_servers,
-            group_id=consumer_group,
-            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-            auto_offset_reset="earliest",
-            enable_auto_commit=False,
-        )
-
-        self.db_session_maker = db_session_maker
-        self.sentiment_analyzer = SentimentAnalyzer(model_type="local")
-        self.backup_analyzer = SentimentAnalyzer(model_type="external")
-
-        self.processed = 0
-        self.errors = 0
-
-    # --------------------------------------------------
-
-    async def process_message(self, message) -> bool:
-        """
-        Process a single Kafka message
-        """
-        post = message.value
-
-        if not post or "content" not in post:
-            logger.warning("Invalid message, skipping")
-            return True
-
-        try:
-            sentiment = await self.sentiment_analyzer.analyze_sentiment(
-                post["content"]
-            )
-            emotion = await self.sentiment_analyzer.analyze_emotion(
-                post["content"]
-            )
-        except Exception:
-            try:
-                sentiment = await self.backup_analyzer.analyze_sentiment(
-                    post["content"]
-                )
-                emotion = await self.backup_analyzer.analyze_emotion(
-                    post["content"]
-                )
-            except Exception as exc:
-                logger.error(f"Analysis failed: {exc}")
-                self.errors += 1
-                return False
-
-        session = self.db_session_maker()
-        try:
-            save_post_and_analysis(session, post, sentiment, emotion)
-            session.commit()
-            self.processed += 1
-            return True
-        except Exception as exc:
-            session.rollback()
-            logger.error(f"DB error: {exc}")
-            self.errors += 1
-            return False
-        finally:
-            session.close()
-
-    # --------------------------------------------------
+    def __init__(self):
+        self.redis = redis.from_url(REDIS_URL, decode_responses=True)
+        self.analyzer = SentimentAnalyzer()
 
     async def run(self):
-        """
-        Main worker loop
-        """
-        logger.info("Sentiment worker started")
+        last_id = "0"
+        logger.info("Worker started")
 
-        try:
-            for message in self.consumer:
-                success = await self.process_message(message)
+        while True:
+            streams = await self.redis.xread(
+                {REDIS_STREAM_NAME: last_id},
+                block=1000
+            )
 
-                if success:
-                    self.consumer.commit()
+            for _, messages in streams:
+                for msg_id, data in messages:
+                    sentiment = await self.analyzer.analyze_sentiment(data["content"])
+                    emotion = await self.analyzer.analyze_emotion(data["content"])
 
-                if self.processed % 10 == 0 and self.processed > 0:
-                    logger.info(
-                        f"Processed={self.processed}, Errors={self.errors}"
-                    )
+                    async with Session() as session:
+                        await save_post_and_analysis(
+                            session,
+                            data,
+                            sentiment,
+                            emotion
+                        )
 
-        except KeyboardInterrupt:
-            logger.info("Worker shutting down gracefully")
+                    last_id = msg_id
+                    logger.info(f"Processed {msg_id}")
 
-        finally:
-            self.consumer.close()
-            logger.info("Kafka consumer closed")
+            await asyncio.sleep(0.2)
+
+if __name__ == "__main__":
+    asyncio.run(SentimentWorker().run())

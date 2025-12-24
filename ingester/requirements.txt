@@ -1,7 +1,3 @@
-requests==2.31.0         # For API calls to social media platforms
-aiohttp==3.9.0           # Optional async HTTP client
-sqlalchemy==2.1.2        # For database ORM
-asyncpg==0.28.0          # If PostgreSQL is used
-pydantic==2.1.1          # Optional, for schema validation
-python-dotenv==1.0.0     # For environment variables
-redis==5.2.0             # To push new posts into Redis pub/sub
+redis==5.0.8
+python-dotenv==1.0.1
+pydantic==2.9.2

@@ -1,92 +1,102 @@
-version: '3.9'
+version: "3.9"
 
 services:
-  # -------------------------------
-  # PostgreSQL Database
-  # -------------------------------
-  db:
-    image: postgres:15
-    container_name: sentiment-db
-    restart: always
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentiment-postgres
     environment:
-      POSTGRES_USER: sentiment_user
-      POSTGRES_PASSWORD: sentiment_pass
-      POSTGRES_DB: sentiment_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sentiment_net
 
-  # -------------------------------
-  # Redis
-  # -------------------------------
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: sentiment-redis
-    restart: always
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentiment_net
 
-  # -------------------------------
-  # Backend API (FastAPI)
-  # -------------------------------
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: sentiment-backend
+    env_file:
+      - .env
     depends_on:
-      - db
-      - redis
-    environment:
-      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    networks:
+      - sentiment_net
 
-  # -------------------------------
-  # Frontend (React)
-  # -------------------------------
-  frontend:
-    build: ./frontend
-    container_name: sentiment-frontend
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: sentiment-worker
+    env_file:
+      - .env
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - sentiment_net
+
+  ingester:
+    build:
+      context: ./ingester
+      dockerfile: Dockerfile
+    container_name: sentiment-ingester
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - sentiment_net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sentiment-frontend
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_started
     ports:
       - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://backend:8000/api
-    command: ["npm", "start"]
+    networks:
+      - sentiment_net
 
-  # -------------------------------
-  # Worker (background tasks)
-  # -------------------------------
-  worker:
-    build: ./worker
-    container_name: sentiment-worker
-    depends_on:
-      - db
-      - redis
-    environment:
-      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-
-  # -------------------------------
-  # Ingester (fetch social media posts)
-  # -------------------------------
-  ingester:
-    build: ./ingester
-    container_name: sentiment-ingester
-    depends_on:
-      - db
-      - redis
-    environment:
-      DATABASE_URL: postgres://sentiment_user:sentiment_pass@db:5432/sentiment_db
-      REDIS_URL: redis://redis:6379/0
-      SOCIAL_API_KEY: your_api_key_here
-
-# -------------------------------
-# Volumes
-# -------------------------------
 volumes:
-  db_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  sentiment_net:
+    driver: bridge

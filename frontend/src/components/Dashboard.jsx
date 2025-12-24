@@ -1,91 +1,128 @@
-import { useEffect, useState } from "react";
-import DistributionChart from "./DistributionChart";
+import React, { useEffect, useState } from "react";
 import SentimentChart from "./SentimentChart";
+import DistributionChart from "./DistributionChart";
 import LiveFeed from "./LiveFeed";
 
-export default function Dashboard() {
-  const [distributionData, setDistributionData] = useState({
-    positive: 0,
-    negative: 0,
-    neutral: 0,
-  });
-  const [trendData, setTrendData] = useState([]);
+const Dashboard = () => {
+  const [lastUpdate, setLastUpdate] = useState(new Date());
   const [metrics, setMetrics] = useState({
     total: 0,
     positive: 0,
     negative: 0,
     neutral: 0,
   });
-  const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
-    // Fetch initial metrics and charts
-    fetch("/api/sentiment/distribution?hours=24")
-      .then((res) => res.json())
-      .then((data) => {
-        setDistributionData(data.distribution);
-        setMetrics({
-          total: data.total,
-          positive: data.distribution.positive,
-          negative: data.distribution.negative,
-          neutral: data.distribution.neutral,
-        });
-        setLastUpdate(new Date(data.cached_at).toLocaleTimeString());
-      });
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 1000);
 
-    fetch("/api/sentiment/aggregate?period=hour")
-      .then((res) => res.json())
-      .then((data) => {
-        const trend = data.data.map((d) => ({
-          timestamp: d.timestamp,
-          positive: d.positive_count,
-          negative: d.negative_count,
-          neutral: d.neutral_count,
-        }));
-        setTrendData(trend);
-      });
+    return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6 space-y-6">
+    <div style={styles.container}>
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Real-Time Sentiment Analysis Dashboard</h1>
-        <span className="text-green-400">● Live</span>
-        {lastUpdate && <span>Last Update: {lastUpdate}</span>}
+      <div style={styles.header}>
+        <h2>Real-Time Sentiment Analysis Dashboard</h2>
+        <div style={styles.headerRight}>
+          <span style={styles.liveStatus}>● Live</span>
+          <span>
+            Last Update: {lastUpdate.toLocaleTimeString()}
+          </span>
+        </div>
       </div>
 
-      {/* Distribution + Live Feed */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DistributionChart data={distributionData} />
-        <LiveFeed />
+      {/* Top Row */}
+      <div style={styles.topRow}>
+        <div style={styles.card}>
+          <h3>Distribution</h3>
+          <DistributionChart />
+        </div>
+
+        <div style={styles.card}>
+          <h3>Recent Posts Feed</h3>
+          <LiveFeed />
+        </div>
       </div>
 
-      {/* Trend chart */}
-      <SentimentChart data={trendData} />
+      {/* Middle Row */}
+      <div style={styles.fullRow}>
+        <h3>Sentiment Trend Over Time</h3>
+        <SentimentChart />
+      </div>
 
-      {/* Metrics cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard label="Total" value={metrics.total} />
-        <MetricCard label="Positive" value={metrics.positive} color="green" />
-        <MetricCard label="Negative" value={metrics.negative} color="red" />
-        <MetricCard label="Neutral" value={metrics.neutral} color="gray" />
+      {/* Metrics Row */}
+      <div style={styles.metricsRow}>
+        <MetricCard title="Total" value={metrics.total} />
+        <MetricCard title="Positive" value={metrics.positive} />
+        <MetricCard title="Negative" value={metrics.negative} />
+        <MetricCard title="Neutral" value={metrics.neutral} />
       </div>
     </div>
   );
-}
+};
 
-function MetricCard({ label, value, color = "white" }) {
-  const colorClasses = {
-    white: "text-white",
-    green: "text-green-400",
-    red: "text-red-400",
-    gray: "text-gray-400",
-  };
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 text-center">
-      <p className="text-sm">{label}</p>
-      <p className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</p>
-    </div>
-  );
-}
+const MetricCard = ({ title, value }) => (
+  <div style={styles.metricCard}>
+    <h4>{title}</h4>
+    <p>{value}</p>
+  </div>
+);
+
+const styles = {
+  container: {
+    padding: "20px",
+    fontFamily: "Arial, sans-serif",
+    backgroundColor: "#f5f7fa",
+    minHeight: "100vh",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+  headerRight: {
+    display: "flex",
+    gap: "15px",
+    alignItems: "center",
+    fontSize: "14px",
+  },
+  liveStatus: {
+    color: "green",
+    fontWeight: "bold",
+  },
+  topRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+  fullRow: {
+    backgroundColor: "#fff",
+    padding: "15px",
+    borderRadius: "8px",
+    marginBottom: "20px",
+  },
+  card: {
+    backgroundColor: "#fff",
+    padding: "15px",
+    borderRadius: "8px",
+    height: "100%",
+  },
+  metricsRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "15px",
+  },
+  metricCard: {
+    backgroundColor: "#fff",
+    padding: "15px",
+    borderRadius: "8px",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+};
+
+export default Dashboard;
