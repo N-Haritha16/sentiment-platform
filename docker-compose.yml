@@ -82,6 +82,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
     container_name: sentiment-frontend
     env_file:
       - .env
@@ -92,6 +93,7 @@ services:
       - "3000:3000"
     networks:
       - sentiment_net
+
 
 volumes:
   postgres_data:
