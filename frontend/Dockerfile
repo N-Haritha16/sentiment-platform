@@ -1,5 +1,4 @@
-# Build stage
-FROM node:18-alpine AS build
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -8,18 +7,6 @@ RUN npm install
 
 COPY . .
 
-# Vite build (uses root index.html)
-RUN npm run build
-
-# Runtime stage
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY --from=build /app/dist ./dist
-
-RUN npm install -g serve
-
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["npm", "run", "dev", "--", "--host"]
