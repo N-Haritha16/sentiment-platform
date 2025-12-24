@@ -94,8 +94,6 @@ services:
     networks:
       - sentiment_net
 
-
-
 volumes:
   postgres_data:
   redis_data:
