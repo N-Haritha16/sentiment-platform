@@ -4,12 +4,11 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm config set registry https://registry.npmjs.org/ \
-    && npm install
+RUN npm install
 
 COPY . .
 
-# Vite build
+# Vite build (uses root index.html)
 RUN npm run build
 
 # Runtime stage
