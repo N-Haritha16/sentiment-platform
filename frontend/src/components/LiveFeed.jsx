@@ -1,62 +1,54 @@
-import { useEffect, useState, useRef } from "react";
+// frontend/src/components/LiveFeed.jsx
+import React from "react";
 
-export default function LiveFeed() {
-  const [posts, setPosts] = useState([]);
-  const feedEndRef = useRef(null);
-
-  useEffect(() => {
-    // Example: WebSocket connection
-    const ws = new WebSocket("wss://your-websocket-url"); // replace with your actual URL
-
-    ws.onopen = () => {
-      console.log("Connected to live feed");
-    };
-
-    ws.onmessage = (event) => {
-      const post = JSON.parse(event.data);
-      setPosts((prev) => [post, ...prev].slice(0, 50)); // keep latest 50 posts
-    };
-
-    ws.onclose = () => console.log("Disconnected from live feed");
-
-    return () => ws.close();
-  }, []);
-
-  useEffect(() => {
-    // Scroll to top whenever posts update
-    if (feedEndRef.current) {
-      feedEndRef.current.scrollTop = 0;
-    }
-  }, [posts]);
+export function LiveFeed({ posts }) {
+  const items = posts || [];
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 flex flex-col h-96">
+    <div className="bg-gray-800 rounded-lg p-4 h-full flex flex-col">
       <h3 className="text-lg font-semibold mb-4">Recent Posts Feed</h3>
-      <div
-        className="overflow-y-auto flex-1 space-y-2"
-        ref={feedEndRef}
-      >
-        {posts.length === 0 ? (
-          <p className="text-gray-400 text-sm">No posts yet...</p>
-        ) : (
-          posts.map((post) => (
-            <div
-              key={post.post_id}
-              className={`p-2 rounded border-l-4 ${
-                post.sentiment === "positive"
-                  ? "border-green-400 bg-gray-700"
-                  : post.sentiment === "negative"
-                  ? "border-red-400 bg-gray-700"
-                  : "border-gray-400 bg-gray-700"
-              }`}
-            >
-              <p className="text-sm">{post.content}</p>
-              <p className="text-xs text-gray-400">
-                Sentiment: {post.sentiment} | ID: {post.post_id}
-              </p>
-            </div>
-          ))
+      <div className="space-y-3 overflow-y-auto max-h-64 pr-2">
+        {items.length === 0 && (
+          <p className="text-gray-400 text-sm">No posts yet</p>
         )}
+
+        {items.map((p) => (
+          <div
+            key={p.post_id}
+            className="border border-gray-700 rounded-md p-2 text-sm"
+          >
+            <div className="flex justify-between mb-1">
+              <span className="text-xs text-gray-400">{p.source}</span>
+              <span className="text-xs text-gray-500">
+                {p.created_at
+                  ? new Date(p.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : ""}
+              </span>
+            </div>
+            <p className="text-gray-100 truncate">{p.content}</p>
+
+            {p.sentiment && (
+              <div className="mt-1 text-xs text-gray-400">
+                Sentiment:{" "}
+                <span
+                  className={
+                    p.sentiment.label === "positive"
+                      ? "text-green-400"
+                      : p.sentiment.label === "negative"
+                      ? "text-red-400"
+                      : "text-gray-300"
+                  }
+                >
+                  {p.sentiment.label}
+                </span>
+                {p.sentiment.emotion ? ` • ${p.sentiment.emotion}` : null}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

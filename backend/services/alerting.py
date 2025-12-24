@@ -1,120 +1,165 @@
 import os
-import asyncio
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 
-from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
-from backend.models.models import (
-    SocialMediaPost,
-    SentimentAnalysis,
-    SentimentAlert
-)
+from backend.models.models import SocialMediaPost, SentimentAnalysis, SentimentAlert
 
 
 class AlertService:
     """
-    Monitors sentiment metrics and triggers alerts on anomalies
+    Monitors sentiment metrics and triggers alerts on anomalies.
     """
 
-    def __init__(self, async_session_maker, redis_client=None):
-        self.async_session_maker = async_session_maker
-        self.redis_client = redis_client
+    def __init__(self, db_session_maker, redis_client):
+        """
+        Initialize with configuration from environment variables.
 
-        self.threshold = float(os.getenv("ALERT_NEGATIVE_RATIO_THRESHOLD", 2.0))
-        self.window_minutes = int(os.getenv("ALERT_WINDOW_MINUTES", 5))
-        self.min_posts = int(os.getenv("ALERT_MIN_POSTS", 10))
+        Loads:
+        - ALERT_NEGATIVE_RATIO_THRESHOLD (default: 2.0)
+        - ALERT_WINDOW_MINUTES (default: 5)
+        - ALERT_MIN_POSTS (default: 10)
+        """
+        self.db_session_maker = db_session_maker
+        self.redis = redis_client
 
-    # --------------------------------------------------
+        self.negative_ratio_threshold: float = float(
+            os.getenv("ALERT_NEGATIVE_RATIO_THRESHOLD", "2.0")
+        )
+        self.window_minutes: int = int(os.getenv("ALERT_WINDOW_MINUTES", "5"))
+        self.min_posts: int = int(os.getenv("ALERT_MIN_POSTS", "10"))
+
+        # Optional: Redis channel to publish alerts to dashboard / workers
+        self.alert_channel = os.getenv("ALERT_CHANNEL", "sentiment_alerts")
 
     async def check_thresholds(self) -> Optional[dict]:
         """
-        Check sentiment ratio for alert triggering
-        """
-        now = datetime.now(timezone.utc)
-        window_start = now - timedelta(minutes=self.window_minutes)
+        Check if current sentiment metrics exceed alert thresholds.
 
-        async with self.async_session_maker() as session:  # AsyncSession
+        Logic:
+        1. Count positive/negative posts in last ALERT_WINDOW_MINUTES.
+        2. If total posts < ALERT_MIN_POSTS, return None (not enough data).
+        3. Calculate ratio = negative_count / positive_count.
+        4. If ratio > ALERT_NEGATIVE_RATIO_THRESHOLD, trigger alert.
+        """
+        async with self.db_session_maker() as db:  # type: AsyncSession
+            now = datetime.utcnow()
+            since = now - timedelta(minutes=self.window_minutes)
+
+            # Aggregate sentiment counts from SentimentAnalysis within window
             query = (
                 select(
-                    SentimentAnalysis.sentiment_label,
-                    func.count().label("count")
+                    func.sum(
+                        func.case(
+                            (SentimentAnalysis.sentiment_label == "positive", 1),
+                            else_=0,
+                        )
+                    ).label("positive"),
+                    func.sum(
+                        func.case(
+                            (SentimentAnalysis.sentiment_label == "negative", 1),
+                            else_=0,
+                        )
+                    ).label("negative"),
+                    func.sum(
+                        func.case(
+                            (SentimentAnalysis.sentiment_label == "neutral", 1),
+                            else_=0,
+                        )
+                    ).label("neutral"),
+                    func.count(SentimentAnalysis.id).label("total"),
                 )
                 .join(
                     SocialMediaPost,
-                    SocialMediaPost.id == SentimentAnalysis.post_id
+                    SocialMediaPost.post_id == SentimentAnalysis.post_id,
                 )
-                .where(SocialMediaPost.created_at >= window_start)
-                .group_by(SentimentAnalysis.sentiment_label)
+                .where(SentimentAnalysis.analyzed_at >= since)
             )
 
-            rows = (await session.execute(query)).all()
+            row = (await db.execute(query)).one_or_none()
+            if row:
+                positive_count, negative_count, neutral_count, total_count = row
+            else:
+                positive_count = negative_count = neutral_count = total_count = 0
 
-        metrics = {
-            "positive": 0,
-            "negative": 0,
-            "neutral": 0
-        }
+            # Not enough data
+            if total_count < self.min_posts:
+                return None
 
-        for label, count in rows:
-            if label in metrics:
-                metrics[label] = count
+            # Avoid division by zero
+            if positive_count == 0:
+                # If there are negative posts and zero positive, treat as infinite ratio
+                if negative_count > 0:
+                    ratio = float("inf")
+                else:
+                    ratio = 0.0
+            else:
+                ratio = negative_count / max(positive_count, 1)
 
-        metrics["total"] = sum(metrics.values())
+            if ratio <= self.negative_ratio_threshold:
+                return None
 
-        if metrics["total"] < self.min_posts or metrics["positive"] == 0:
-            return None
-
-        negative_ratio = metrics["negative"] / metrics["positive"]
-
-        if negative_ratio > self.threshold:
-            return {
+            alert_data: Dict[str, Any] = {
                 "alert_triggered": True,
                 "alert_type": "high_negative_ratio",
-                "threshold": self.threshold,
-                "actual_ratio": round(negative_ratio, 2),
+                "threshold": self.negative_ratio_threshold,
+                "actual_ratio": ratio,
                 "window_minutes": self.window_minutes,
-                "metrics": metrics,
-                "timestamp": now.isoformat()
+                "metrics": {
+                    "positive_count": int(positive_count),
+                    "negative_count": int(negative_count),
+                    "neutral_count": int(neutral_count),
+                    "total_count": int(total_count),
+                },
+                "timestamp": now.replace(microsecond=0).isoformat() + "Z",
             }
 
-        return None
-
-    # --------------------------------------------------
+            return alert_data
 
     async def save_alert(self, alert_data: dict) -> int:
         """
-        Persist alert to database
+        Save alert to database and return its ID.
         """
-        async with self.async_session_maker() as session:
+        async with self.db_session_maker() as db:  # type: AsyncSession
             alert = SentimentAlert(
-                alert_type=alert_data["alert_type"],
-                threshold=alert_data["threshold"],
-                actual_ratio=alert_data["actual_ratio"],
-                window_minutes=alert_data["window_minutes"],
-                metrics=alert_data["metrics"],
-                triggered_at=datetime.fromisoformat(alert_data["timestamp"])
+                alert_type=alert_data.get("alert_type"),
+                threshold_value=alert_data.get("threshold"),
+                actual_value=alert_data.get("actual_ratio"),
+                window_minutes=alert_data.get("window_minutes"),
+                positive_count=alert_data["metrics"]["positive_count"],
+                negative_count=alert_data["metrics"]["negative_count"],
+                neutral_count=alert_data["metrics"]["neutral_count"],
+                total_count=alert_data["metrics"]["total_count"],
+                created_at=datetime.utcnow(),
+                raw_payload=alert_data,  # assuming JSON / JSONB column
             )
 
-            session.add(alert)
-            await session.commit()
-            await session.refresh(alert)
+            db.add(alert)
+            await db.commit()
+            await db.refresh(alert)
+
+            # Optionally publish to Redis so dashboards can react
+            try:
+                await self.redis.publish(self.alert_channel, json.dumps(alert_data))
+            except Exception:
+                # Alert persistence is primary; pub/sub failure is non-fatal
+                pass
+
             return alert.id
 
-    # --------------------------------------------------
-
-    async def run_monitoring_loop(self, interval_seconds: int = 60):
+    async def run_monitoring_loop(self, check_interval_seconds: int = 60):
         """
-        Continuous monitoring loop
+        Continuously monitor and trigger alerts.
         """
         while True:
             try:
                 alert = await self.check_thresholds()
-                if alert:
-                    alert_id = await self.save_alert(alert)
-                    print(f"[ALERT] Triggered alert {alert_id}")
-            except Exception as exc:
-                print(f"[ALERT ERROR] {exc}")
+                if alert and alert.get("alert_triggered"):
+                    await self.save_alert(alert)
+            except Exception:
+                # In production, log this exception with proper logger
+                pass
 
-            await asyncio.sleep(interval_seconds)
+            await asyncio.sleep(check_interval_seconds)

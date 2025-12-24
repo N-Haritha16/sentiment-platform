@@ -1,35 +1,41 @@
-import os
+from pydantic_settings import BaseSettings
+from functools import lru_cache
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://sentiment:sentiment@db:5432/sentimentdb"
-)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-REDIS_STREAM_NAME = os.getenv("REDIS_STREAM_NAME", "social_media_posts")
-REDIS_CONSUMER_GROUP = os.getenv("REDIS_CONSUMER_GROUP", "sentiment_workers")
+class Settings(BaseSettings):
+    postgres_user: str
+    postgres_password: str
+    postgres_db: str
+    postgres_host: str = "postgres"
+    postgres_port: int = 5432
+    database_url: str
 
-API_HOST = os.getenv("API_HOST", "0.0.0.0")
-API_PORT = int(os.getenv("API_PORT", 8000))
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_stream_name: str = "social_posts_stream"
+    redis_consumer_group: str = "sentiment_workers"
+    redis_cache_prefix: str = "sentiment_cache"
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    huggingface_model: str = "distilbert-base-uncased-finetuned-sst-2-english"
+    emotion_model: str = "j-hartmann/emotion-english-distilroberta-base"
+    external_llm_provider: str = "groq"
+    external_llm_api_key: str
+    external_llm_model: str = "llama-3.1-8b-instant"
 
-HUGGINGFACE_MODEL = os.getenv(
-    "HUGGINGFACE_MODEL",
-    "distilbert-base-uncased-finetuned-sst-2-english"
-)
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    frontend_port: int = 3000
+    log_level: str = "INFO"
 
-EMOTION_MODEL = os.getenv(
-    "EMOTION_MODEL",
-    "j-hartmann/emotion-english-distilroberta-base"
-)
+    alert_negative_ratio_threshold: float = 2.0
+    alert_window_minutes: int = 5
+    alert_min_posts: int = 10
 
-EXTERNAL_LLM_PROVIDER = os.getenv("EXTERNAL_LLM_PROVIDER", "")
-EXTERNAL_LLM_API_KEY = os.getenv("EXTERNAL_LLM_API_KEY", "")
-EXTERNAL_LLM_MODEL = os.getenv("EXTERNAL_LLM_MODEL", "")
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
-ALERT_NEGATIVE_RATIO_THRESHOLD = float(
-    os.getenv("ALERT_NEGATIVE_RATIO_THRESHOLD", 2.0)
-)
-ALERT_WINDOW_MINUTES = int(os.getenv("ALERT_WINDOW_MINUTES", 5))
-ALERT_MIN_POSTS = int(os.getenv("ALERT_MIN_POSTS", 10))
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

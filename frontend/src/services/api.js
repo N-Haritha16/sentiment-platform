@@ -1,119 +1,68 @@
-// api.js
-const API_BASE_URL = "http://localhost:8000/api"; // replace with your actual backend URL
-let ws = null;
+// frontend/src/services/api.js
 
-/**
- * Fetch posts with optional filters
- * @param {number} limit - number of posts to fetch
- * @param {number} offset - pagination offset
- * @param {object} filters - {source, sentiment, start_date, end_date}
- */
-export async function fetchPosts(limit = 50, offset = 0, filters = {}) {
-  const params = new URLSearchParams({
-    limit,
-    offset,
-    ...filters,
-  });
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env.VITE_API_BASE) ||
+  "http://localhost:8000";
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/posts?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch posts");
-    }
-    return await response.json();
-  } catch (err) {
-    console.error("fetchPosts error:", err);
-    return { posts: [], total: 0 };
-  }
+// GET /api/posts
+export async function fetchPosts(limit = 20, offset = 0, filters = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  if (filters.source) params.set("source", filters.source);
+  if (filters.sentiment) params.set("sentiment", filters.sentiment);
+  if (filters.start_date) params.set("start_date", filters.start_date);
+  if (filters.end_date) params.set("end_date", filters.end_date);
+
+  const res = await fetch(`${API_BASE}/api/posts?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch posts");
+  return res.json();
 }
 
-/**
- * Fetch sentiment distribution over last X hours
- * @param {number} hours - timeframe in hours
- * @param {string} source - optional source filter
- */
-export async function fetchDistribution(hours = 24, source = "") {
-  const params = new URLSearchParams({ hours });
-  if (source) params.append("source", source);
+// GET /api/sentiment/distribution
+export async function fetchDistribution(hours = 24) {
+  const params = new URLSearchParams();
+  params.set("hours", String(hours));
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/sentiment/distribution?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch distribution");
-    }
-    return await response.json();
-  } catch (err) {
-    console.error("fetchDistribution error:", err);
-    return { distribution: { positive: 0, negative: 0, neutral: 0 }, total: 0 };
-  }
+  const res = await fetch(
+    `${API_BASE}/api/sentiment/distribution?${params.toString()}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch distribution");
+  return res.json();
 }
 
-/**
- * Fetch sentiment aggregate data (time buckets)
- * @param {string} period - "minute" | "hour" | "day"
- * @param {string} startDate - ISO string
- * @param {string} endDate - ISO string
- * @param {string} source - optional source filter
- */
-export async function fetchAggregateData(period = "hour", startDate, endDate, source = "") {
-  const params = new URLSearchParams({ period });
-  if (startDate) params.append("start_date", startDate);
-  if (endDate) params.append("end_date", endDate);
-  if (source) params.append("source", source);
+// GET /api/sentiment/aggregate
+export async function fetchAggregateData(period = "hour", startDate, endDate) {
+  const params = new URLSearchParams();
+  params.set("period", period);
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/sentiment/aggregate?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch aggregate data");
-    }
-    return await response.json();
-  } catch (err) {
-    console.error("fetchAggregateData error:", err);
-    return { data: [], summary: {} };
-  }
+  const res = await fetch(
+    `${API_BASE}/api/sentiment/aggregate?${params.toString()}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch aggregate data");
+  return res.json();
 }
 
-/**
- * Connect to WebSocket for live sentiment updates
- * @param {function} onMessage - callback when a new message arrives
- * @param {function} onError - callback on WebSocket error
- * @param {function} onClose - callback on WebSocket close
- */
+// WebSocket connection helper -> /ws/sentiment
 export function connectWebSocket(onMessage, onError, onClose) {
-  ws = new WebSocket("ws://localhost:8000/ws/sentiment"); // replace with your backend WS URL
+  let wsBase;
+  try {
+    const url = new URL(API_BASE);
+    const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+    wsBase = `${wsProtocol}//${url.host}`;
+  } catch (e) {
+    wsBase = API_BASE.replace(/^http/, "ws");
+  }
 
-  ws.onopen = () => {
-    console.log("WebSocket connected");
-  };
+  const ws = new WebSocket(`${wsBase}/ws/sentiment`);
 
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onMessage && onMessage(data);
-    } catch (err) {
-      console.error("WebSocket message parse error:", err);
-    }
-  };
-
-  ws.onerror = (err) => {
-    console.error("WebSocket error:", err);
-    onError && onError(err);
-  };
-
-  ws.onclose = (event) => {
-    console.log("WebSocket closed:", event);
-    onClose && onClose(event);
-  };
+  ws.onmessage = onMessage;
+  if (onError) ws.onerror = onError;
+  if (onClose) ws.onclose = onClose;
 
   return ws;
-}
-
-/**
- * Optional: disconnect WebSocket
- */
-export function disconnectWebSocket() {
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
 }

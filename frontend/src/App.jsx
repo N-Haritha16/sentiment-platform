@@ -1,20 +1,15 @@
-export async function sendText(text) {
-  try {
-    const response = await fetch("http://localhost:8000/ingest", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ text })
-    });
+import React from "react";
+import ReactDOM from "react-dom/client";
+import Dashboard from "./components/Dashboard";
 
-    if (!response.ok) {
-      throw new Error("Failed to send text");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error sending text:", error);
-    throw error;
-  }
+function App() {
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: "16px" }}>
+      <h1>Sentiment Analysis Dashboard</h1>
+      <Dashboard />
+    </div>
+  );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+export default App;
