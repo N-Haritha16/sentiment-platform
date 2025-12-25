@@ -10,14 +10,14 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
-from backend.models.models import (
+from models.models import (
     SocialMediaPost,
     SentimentAnalysis,
     SentimentAlert,
     get_db_session,
 )
-from backend.config import get_settings
-from backend.services.aggregator import SentimentAggregator
+from config import get_settings
+from services.aggregator import SentimentAggregator
 
 settings = get_settings()
 router = APIRouter()

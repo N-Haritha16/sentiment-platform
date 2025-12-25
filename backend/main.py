@@ -2,9 +2,9 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.config import get_settings
-from backend.models.models import init_models
-from backend.api.routes import router as api_router
+from config import get_settings
+from models.models import init_models
+from api.routes import router as api_router
 
 settings = get_settings()
 

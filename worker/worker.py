@@ -6,7 +6,7 @@ from typing import Any, Dict
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.services.sentiment_analyzer import SentimentAnalyzer
+from services.sentiment_analyzer import SentimentAnalyzer
 from worker.processor import save_post_and_analysis
 
 
