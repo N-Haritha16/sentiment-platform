@@ -2,6 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app
+
 RUN python -m pip install --upgrade pip setuptools wheel
 
 COPY requirements.txt .

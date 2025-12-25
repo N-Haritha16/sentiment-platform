@@ -2,6 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app
+
 # Upgrade pip with retries
 RUN python -m pip install --upgrade pip setuptools wheel --timeout 120 --retries 5
 
