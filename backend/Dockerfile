@@ -2,14 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Upgrade pip with retries
-RUN python -m pip install --upgrade pip setuptools wheel --timeout 120 --retries 5
+# Upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy requirements and install with retries
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --timeout 120 --retries 5
+# Copy backend requirements and install
+COPY backend/requirements.txt ./backend/
+RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
-# Copy rest of the code
+# Copy the entire project
 COPY . .
 
-CMD ["python", "main.py"]  # backend entrypoint
+# Set PYTHONPATH so other services can import backend
+ENV PYTHONPATH=/app
+
+# Set the entrypoint for backend
+CMD ["python", "backend/main.py"]
