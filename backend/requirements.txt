@@ -1,0 +1,19 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.25
+asyncpg==0.30.0
+alembic==1.14.0
+python-dotenv==1.0.1
+redis==5.0.8
+pydantic==2.9.2
+pydantic-settings==2.6.1
+httpx==0.27.2
+transformers==4.46.0
+# Old line (does not exist)
+## torch==2.4.1+cpu
+
+# Replace with valid CPU version
+torch==2.9.1+cpu
+

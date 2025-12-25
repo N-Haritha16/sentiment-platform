@@ -1,0 +1,5 @@
+redis==5.0.8
+python-dotenv==1.0.1
+pydantic==2.9.2
+sqlalchemy==2.0.25
+
