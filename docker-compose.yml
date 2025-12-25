@@ -1,55 +1,104 @@
-version: "3.9"
+
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentiment-postgres
+    env_file: .env  # ✅ ADDED - Forces .env loading for postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sentiment_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentiment-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentiment_net
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sentiment-backend
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
-    depends_on:
-      - postgres
-      - redis
+    networks:
+      - sentiment_net
 
   worker:
     build:
-      context: .
+      context: ./worker
       dockerfile: worker/Dockerfile
     container_name: sentiment-worker
+    env_file:
+      - .env
     depends_on:
-      - redis
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - sentiment_net
 
   ingester:
     build:
-      context: .
+      context: ./ingester
       dockerfile: ingester/Dockerfile
     container_name: sentiment-ingester
+    env_file:
+      - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    networks:
+      - sentiment_net
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: sentiment-frontend
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_started
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
+    networks:
+      - sentiment_net
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: sentiment-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: sentiment
-    ports:
-      - "5432:5432"
+volumes:
+  postgres_data:
+  redis_data:
 
-  redis:
-    image: redis:7-alpine
-    container_name: sentiment-redis
-    ports:
-      - "6379:6379"
+networks:
+  sentiment_net:
+    driver: bridge

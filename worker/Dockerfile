@@ -5,15 +5,14 @@ WORKDIR /app
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy requirements and install
-COPY requirements.txt .
+# Install dependencies
+COPY worker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy worker code
-COPY . .
+COPY worker/ ./
 
 # Copy backend code so imports work
-COPY ../backend ./backend
+COPY backend/ ./backend
 
-# Run worker
 CMD ["python", "worker.py"]
