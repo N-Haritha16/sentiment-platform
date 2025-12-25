@@ -1,10 +1,12 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+
 ENV PYTHONPATH=/app
 
-COPY backend ./backend
+COPY backend /app/backend
+COPY requirements.txt /app/requirements.txt
 
-RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-CMD ["python", "backend/main.py"]
+CMD ["python", "-m", "backend.main"]

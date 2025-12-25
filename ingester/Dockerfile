@@ -1,11 +1,9 @@
+
 FROM python:3.11-slim
-
 WORKDIR /app
-ENV PYTHONPATH=/app
 
-COPY backend ./backend
-COPY ingester ./ingester
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "ingester.py"]
 
-RUN pip install --no-cache-dir -r ingester/requirements.txt
-
-CMD ["python", "ingester/ingester.py"]
