@@ -1,6 +1,15 @@
 .env
+<<<<<<< HEAD
 node_modules
 __pycache__/
 *.pyc
 dist
 build
+=======
+.venv/
+__pycache__/
+node_modules/
+dist/
+build/
+*.log
+>>>>>>> ac531508b397d3a3c0cd9a493cf30f485c47b31b
