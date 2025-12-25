@@ -2,18 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy backend requirements and install
-COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r ./backend/requirements.txt
+# COPY requirements from current context (./backend)
+COPY requirements.txt ./
 
-# Copy the entire project
-COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Set PYTHONPATH so other services can import backend
+# Copy entire project
+COPY .. /app
+
 ENV PYTHONPATH=/app
 
-# Set the entrypoint for backend
 CMD ["python", "backend/main.py"]

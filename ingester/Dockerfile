@@ -2,15 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy ingester requirements and install
-COPY ingester/requirements.txt ./ingester/
-RUN pip install --no-cache-dir -r ./ingester/requirements.txt
+RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy the entire project
-COPY . .
+COPY requirements.txt ./
 
-# Set PYTHONPATH so ingester can import backend
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY .. /app
+
 ENV PYTHONPATH=/app
 
-# Set entrypoint for ingester
 CMD ["python", "ingester/ingester.py"]
