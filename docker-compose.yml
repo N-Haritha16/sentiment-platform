@@ -77,7 +77,7 @@ services:
     networks:
       - sentiment_net
 
-  frontend:                # ✅ FIXED indentation
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -91,6 +91,7 @@ services:
       - "3000:3000"
     networks:
       - sentiment_net
+
 
 volumes:
   postgres_data:
