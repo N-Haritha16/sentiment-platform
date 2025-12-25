@@ -1,23 +1,24 @@
-# Build stage
-FROM node:18-alpine AS build
+# Stage 1: Build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
+# Install dependencies
 COPY package.json package-lock.json* ./
 RUN npm ci
 
+# Copy source code and build
 COPY . .
 RUN npm run build
 
-# Production stage
+# Stage 2: Production
 FROM nginx:alpine
 
-# Replace default nginx config
+# Copy custom nginx config
 COPY nginx/default.config /etc/nginx/conf.d/default.conf
 
 # Copy build output
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 3000
-
 CMD ["nginx", "-g", "daemon off;"]
