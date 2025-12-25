@@ -2,19 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Avoid pip cache + increase timeout globally
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DEFAULT_TIMEOUT=120
+# Upgrade pip with retries
+RUN python -m pip install --upgrade pip setuptools wheel --timeout 120 --retries 5
 
-# Copy only requirements first (Docker layer caching)
+# Copy requirements and install with retries
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt --timeout 120 --retries 5
 
-# Upgrade pip ONLY (do NOT upgrade setuptools/wheel)
-RUN python -m pip install --upgrade pip && \
-    pip install -r requirements.txt
-
-# Copy application code
+# Copy rest of the code
 COPY . .
 
-# Change this if worker uses a different entry
-CMD ["python", "main.py"]
+CMD ["python", "main.py"]  # backend entrypoint
