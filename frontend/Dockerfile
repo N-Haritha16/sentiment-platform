@@ -1,10 +1,10 @@
 # Build stage
-FROM node:20-alpine AS build
+FROM node:18-alpine AS build   # ← change Node 20 to Node 18
 
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci                    # ← use npm ci for a clean install
 
 COPY . .
 RUN npm run build
