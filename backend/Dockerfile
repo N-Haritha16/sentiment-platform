@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-# Upgrade pip first
-RUN pip install --upgrade pip
+# Upgrade pip first to avoid JSON decode errors
+RUN python -m pip install --upgrade pip setuptools wheel
 
 # Then install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
