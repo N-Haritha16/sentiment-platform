@@ -1,14 +1,10 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-
 ENV PYTHONPATH=/app
 
-RUN python -m pip install --upgrade pip setuptools wheel
+COPY backend ./backend
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-COPY . .
-
-CMD ["python", "main.py"]
+CMD ["python", "backend/main.py"]
