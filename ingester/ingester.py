@@ -2,16 +2,13 @@ import asyncio
 import random
 from datetime import datetime, timezone
 from typing import Dict, Optional
-import os
+
 import redis.asyncio as redis
 
-# INLINE CONFIG - REPLACES "from backend.config import get_settings"
-class Settings:
-    redis_host = os.getenv("REDIS_HOST", "redis")
-    redis_port = int(os.getenv("REDIS_PORT", 6379))
-    redis_stream_name = os.getenv("REDIS_STREAM_NAME", "social_posts_stream")
+from backend.config import get_settings
 
-settings = Settings()
+settings = get_settings()
+
 
 class DataIngester:
     """
@@ -53,6 +50,7 @@ class DataIngester:
     def generate_post(self) -> Dict[str, str]:
         """
         Generate a single realistic post with varied sentiment.
+
         Returns dict with keys: post_id, source, content, author, created_at.
         """
         sentiment_roll = random.random()
@@ -114,6 +112,7 @@ class DataIngester:
             await self.publish_post(post)
             await asyncio.sleep(delay)
 
+
 async def main() -> None:
     client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
     ingester = DataIngester(
@@ -121,8 +120,8 @@ async def main() -> None:
         stream_name=settings.redis_stream_name,
         posts_per_minute=30,
     )
-    print(f"🚀 Ingester started - publishing 30/min to {settings.redis_stream_name}")
     await ingester.start()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
