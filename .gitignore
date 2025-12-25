@@ -13,3 +13,4 @@ dist/
 build/
 *.log
 >>>>>>> ac531508b397d3a3c0cd9a493cf30f485c47b31b
+.env
