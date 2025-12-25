@@ -2,15 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Upgrade pip with retries
-RUN python -m pip install --upgrade pip setuptools wheel --timeout 120 --retries 5
+# Upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy requirements and install with retries
+# Copy requirements and install
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --timeout 120 --retries 5
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy rest of the code
+# Copy worker code
 COPY . .
 
-# Set entrypoint for worker
+# Copy backend code so imports work
+COPY ../backend ./backend
+
+# Run worker
 CMD ["python", "worker.py"]
