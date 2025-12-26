@@ -1,16 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-WORKDIR /worker
+WORKDIR /app
 
-# Upgrade pip with retries
-RUN python -m pip install --upgrade pip setuptools wheel --timeout 120 --retries 5
+COPY . /app
 
-# Copy requirements and install with retries
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --timeout 120 --retries 5
+ENV PYTHONPATH=/app
 
-# Copy rest of the code
-COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Set entrypoint for worker
-CMD ["python", "worker.py"]
+CMD ["python", "worker/worker.py"]
