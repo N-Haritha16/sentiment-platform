@@ -105,3 +105,7 @@ async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_o
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_factory() as session:
         yield session
+
+async def init_models(engine):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
