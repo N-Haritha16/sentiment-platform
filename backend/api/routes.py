@@ -17,7 +17,7 @@ from models.models import (
     get_db_session,
 )
 from config import get_settings
-from services.aggregator import SentimentAggregator
+from backend.services.aggregator import SentimentAggregator
 
 settings = get_settings()
 router = APIRouter()

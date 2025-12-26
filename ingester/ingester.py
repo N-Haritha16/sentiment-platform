@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 import redis.asyncio as redis
 
-from config import get_settings
+from backend.config import get_settings
 
 settings = get_settings()
 
