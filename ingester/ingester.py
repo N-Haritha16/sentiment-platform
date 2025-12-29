@@ -5,7 +5,10 @@ from typing import Dict, Optional
 
 import redis.asyncio as redis
 
-from backend.config import get_settings
+import os
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
+
 
 settings = get_settings()
 
