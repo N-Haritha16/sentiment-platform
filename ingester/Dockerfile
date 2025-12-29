@@ -1,6 +1,4 @@
-# ingester/Dockerfile
 FROM python:3.11-slim
-
 WORKDIR /app
 
 RUN python -m pip install --upgrade pip setuptools wheel
