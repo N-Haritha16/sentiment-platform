@@ -9,5 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# ✅ FIXED: Run forever
 CMD ["python", "ingester.py"]

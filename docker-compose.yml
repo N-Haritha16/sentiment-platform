@@ -1,21 +1,21 @@
-version: '3.8'
+
+
 services:
   postgres:
     image: postgres:15-alpine
     container_name: sentiment-postgres
-    env_file: .env
+    env_file: .env  # ✅ ADDED - Forces .env loading for postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/01-init.sql  # ✅ AUTO-CREATES TABLES
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 10  # ✅ Increased retries
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - sentiment_net
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     volumes:
       - redis_data:/data
     networks:
@@ -38,7 +38,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sentiment-backend
-    env_file: .env
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,12 +47,6 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
-    healthcheck:  # ✅ ADDED
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
     networks:
       - sentiment_net
 
@@ -60,49 +55,41 @@ services:
       context: ./worker
       dockerfile: Dockerfile
     container_name: sentiment-worker
-    env_file: .env
-    depends_on:  # ✅ FIXED: Remove backend dependency
-      postgres:
-        condition: service_healthy
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_started
       redis:
         condition: service_healthy
-    healthcheck:  # ✅ ADDED
-      test: ["CMD-SHELL", "python -c 'import redis; r=redis.Redis(host=\"${REDIS_HOST}\", port=${REDIS_PORT}, db=0); print(r.ping())'"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+      postgres:
+        condition: service_healthy
     networks:
       - sentiment_net
-    restart: unless-stopped  # ✅ ADDED
 
   ingester:
     build:
       context: ./ingester
       dockerfile: Dockerfile
     container_name: sentiment-ingester
-    env_file: .env
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:  # ✅ ADDED
-      test: ["CMD-SHELL", "python -c 'import redis; r=redis.Redis(host=\"${REDIS_HOST}\", port=${REDIS_PORT}, db=0); print(r.ping())'"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
     networks:
       - sentiment_net
-    restart: unless-stopped  # ✅ ADDED
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: sentiment-frontend
-    env_file: .env
+    env_file:
+      - .env
     depends_on:
       backend:
-        condition: service_healthy  # ✅ CHANGED to healthy
+        condition: service_started
     ports:
       - "3000:3000"
     networks:
