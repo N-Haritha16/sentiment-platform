@@ -2,12 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY ../backend /app/backend
-COPY requirements.txt .
+COPY backend /app/backend
+COPY ingester /app/ingester
+
+WORKDIR /app/ingester
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
 
 ENV PYTHONPATH=/app
 

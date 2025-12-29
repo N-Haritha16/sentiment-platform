@@ -53,7 +53,7 @@ services:
   worker:
     build:
       context: ./worker
-      dockerfile: Dockerfile
+      dockerfile: worker/Dockerfile
     container_name: sentiment-worker
     env_file:
       - .env
@@ -70,7 +70,7 @@ services:
   ingester:
     build:
       context: ./ingester
-      dockerfile: Dockerfile
+      dockerfile: ingester/Dockerfile
     container_name: sentiment-ingester
     env_file:
       - .env

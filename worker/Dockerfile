@@ -2,13 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# copy backend so worker can import it
-COPY ../backend /app/backend
-COPY requirements.txt .
+# copy shared backend code
+COPY backend /app/backend
+
+# copy worker code
+COPY worker /app/worker
+
+WORKDIR /app/worker
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
 
 ENV PYTHONPATH=/app
 
